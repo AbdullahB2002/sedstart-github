@@ -1,31 +1,35 @@
-trigger: none
+trigger:
+- main
 
 pool:
-  vmImage: ubuntu-latest
+  vmImage: 'ubuntu-latest'
 
 variables:
-- group: SedStartSecrets   # your variable group name
+- group: SedstartVariables   # Must contain: GITHUB_USER, GITHUB_PAT, SEDSTART_API_KEY_PROD
 
 steps:
-  - checkout: none
+# Step 1: Install Node.js (optional if needed by SedStart)
+- task: NodeTool@0
+  inputs:
+    versionSpec: '20.x'
+  displayName: "Install Node.js 20"
 
-  - task: DockerInstaller@0
-    displayName: "Install Docker on agent"
+# Step 2: Login to GitHub Container Registry (GHCR)
+- script: |
+    echo "Logging in to GHCR..."
+    echo "$(GITHUB_PAT)" | docker login ghcr.io -u "$(GITHUB_USER)" --password-stdin
+  displayName: "Login to GHCR"
 
-  - script: |
-      echo "Pulling SedStart GitHub Action container..."
-      docker pull ghcr.io/sedinqa/sedstart:latest
-    displayName: "Pull SedStart Docker Image"
+# Step 3: Pull SedStart Docker Image
+- script: |
+    echo "Pulling SedStart Docker Image..."
+    docker pull ghcr.io/sedinqa/sedstart:latest
+  displayName: "Pull SedStart Docker Image"
 
-  - script: |
-      echo "Running SedStart test..."
-      docker run \
-        -e API_KEY="$(SEDSTART_API_KEY_PROD)" \
-        -e PROJECT_ID="334" \
-        -e TEST_ID="2093" \
-        -e PROFILE_ID="406" \
-        -e BROWSER="chrome" \
-        -e HEADLESS="false" \
-        ghcr.io/sedinqa/sedstart:latest
-    displayName: "Run SedStart Test"
-
+# Step 4: Run SedStart Testcase inside Docker container using only API key
+- script: |
+    echo "Running SedStart Testcase..."
+    docker run --rm \
+      -e API_KEY="$(SEDSTART_API_KEY_PROD)" \
+      ghcr.io/sedinqa/sedstart:latest
+  displayName: "Run SedStart Testcase"
