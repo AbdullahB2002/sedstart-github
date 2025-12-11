@@ -1,35 +1,30 @@
-trigger:
-- main
+trigger: none  # Makes it manual only, like workflow_dispatch. Remove if you want auto-triggers.
 
 pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-- group: SedstartVariables   # Must contain: GITHUB_USER, GITHUB_PAT, SEDSTART_API_KEY_PROD
+- group: sedstart-secrets  # Replace with your variable group name if using one
+# Or if not using group: - name: SEDSTART_API_KEY_PROD
+#   value: $(your-secret-here) but better with group
 
 steps:
-# Step 1: Install Node.js (optional if needed by SedStart)
-- task: NodeTool@0
+- task: Bash@3
+  displayName: 'Trigger Sedstart Test Run'
   inputs:
-    versionSpec: '20.x'
-  displayName: "Install Node.js 20"
-
-# Step 2: Login to GitHub Container Registry (GHCR)
-- script: |
-    echo "Logging in to GHCR..."
-    echo "$(GITHUB_PAT)" | docker login ghcr.io -u "$(GITHUB_USER)" --password-stdin
-  displayName: "Login to GHCR"
-
-# Step 3: Pull SedStart Docker Image
-- script: |
-    echo "Pulling SedStart Docker Image..."
-    docker pull ghcr.io/sedinqa/sedstart:latest
-  displayName: "Pull SedStart Docker Image"
-
-# Step 4: Run SedStart Testcase inside Docker container using only API key
-- script: |
-    echo "Running SedStart Testcase..."
-    docker run --rm \
-      -e API_KEY="$(SEDSTART_API_KEY_PROD)" \
-      ghcr.io/sedinqa/sedstart:latest
-  displayName: "Run SedStart Testcase"
+    targetType: 'inline'
+    script: |
+      curl -X POST "https://api.sedstart.com/run" \
+        -H "Authorization: Bearer $(SEDSTART_API_KEY_PROD)" \
+        -H "Content-Type: application/json" \
+        -d '{
+          "project_id": 334,
+          "test_id": 2093,
+          "profile_id": 406,
+          "browser": "chrome",
+          "headless": false
+        }'
+      
+      echo "Sedstart test triggered! Check your Sedstart dashboard for results."
+  env:
+    SEDSTART_API_KEY_PROD: $(SEDSTART_API_KEY_PROD)  # Passes the secret to the task
