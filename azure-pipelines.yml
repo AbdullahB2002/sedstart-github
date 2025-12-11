@@ -1,18 +1,27 @@
-name: Sedstart Prod
- 
-on:
-  workflow_dispatch:
- 
-jobs:
-  sedstart-run:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Trigger SedStart test run
-        uses: sedinqa/sedstart@v1
-        with:
-          api_key: ${{ secrets.SEDSTART_API_KEY_PROD }}
-          project_id: 334
-          test_id: 2093
-          profile_id: 406
-          browser: chrome
-          headless: false
+trigger: none
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+- group: SedStartSecrets   # your variable group
+
+steps:
+  - checkout: self
+
+  - task: NodeTool@0
+    displayName: "Use Node LTS"
+    inputs:
+      versionSpec: '18.x'
+
+  - script: |
+      echo "Running SedStart..."
+      npx --yes sedstart \
+        --api_key $(SEDSTART_API_KEY_PROD) \
+        --project_id 334 \
+        --test_id 2093 \
+        --profile_id 406 \
+        --browser chrome \
+        --headless true
+    displayName: "Run SedStart"
+
