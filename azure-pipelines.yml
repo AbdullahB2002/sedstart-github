@@ -4,24 +4,21 @@ pool:
   vmImage: ubuntu-latest
 
 variables:
-- group: SedStartSecrets   # your variable group
+- group: SedStartSecrets  # your variable group
 
 steps:
   - checkout: self
 
-  - task: NodeTool@0
-    displayName: "Use Node LTS"
-    inputs:
-      versionSpec: '18.x'
-
   - script: |
-      echo "Running SedStart..."
-      npx --yes sedstart \
-        --api_key $(SEDSTART_API_KEY_PROD) \
-        --project_id 334 \
-        --test_id 2093 \
-        --profile_id 406 \
-        --browser chrome \
-        --headless true
-    displayName: "Run SedStart"
-
+      echo "Triggering SedStart test run..."
+      curl -X POST "https://api.sedstart.com/v1/tests/run" \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer $(SEDSTART_API_KEY_PROD)" \
+        -d '{
+          "project_id": 334,
+          "test_id": 2093,
+          "profile_id": 406,
+          "browser": "chrome",
+          "headless": false
+        }'
+    displayName: "Run SedStart Test via API"
