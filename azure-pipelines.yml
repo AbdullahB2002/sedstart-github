@@ -1,30 +1,46 @@
-trigger: none  # Makes it manual only, like workflow_dispatch. Remove if you want auto-triggers.
+trigger: none  # Manual trigger only (like your workflow_dispatch)
 
 pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-- group: sedstart-secrets  # Replace with your variable group name if using one
-# Or if not using group: - name: SEDSTART_API_KEY_PROD
-#   value: $(your-secret-here) but better with group
+  - group: sedstart-secrets  # Make sure this group contains GITHUB_PAT (and SEDSTART_API_KEY_PROD if you want to keep it)
 
 steps:
-- task: Bash@3
-  displayName: 'Trigger Sedstart Test Run'
-  inputs:
-    targetType: 'inline'
-    script: |
-      curl -X POST "https://api.sedstart.com/run" \
-        -H "Authorization: Bearer $(SEDSTART_API_KEY_PROD)" \
-        -H "Content-Type: application/json" \
-        -d '{
-          "project_id": 334,
-          "test_id": 2093,
-          "profile_id": 406,
-          "browser": "chrome",
-          "headless": false
-        }'
-      
-      echo "Sedstart test triggered! Check your Sedstart dashboard for results."
-  env:
-    SEDSTART_API_KEY_PROD: $(SEDSTART_API_KEY_PROD)  # Passes the secret to the task
+  - task: Bash@3
+    displayName: 'Dispatch Sedstart Prod Workflow on GitHub'
+    inputs:
+      targetType: 'inline'
+      script: |
+        # Optional: Install jq for nicer JSON output (remove if you don't want it)
+        sudo apt-get update -qq && sudo apt-get install -y jq >/dev/null 2>&1 || echo "jq not installed, skipping pretty print"
+
+        # Dispatch your exact GitHub workflow
+        RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+          "https://api.github.com/repos/AbdullahB2002/sedstart-github/actions/workflows/sedstart-prod.yml/dispatches" \
+          -H "Authorization: token $(GITHUB_PAT)" \
+          -H "Accept: application/vnd.github.v3+json" \
+          -H "Content-Type: application/json" \
+          -d '{
+            "ref": "main"   # Change to "master" or your default branch if different
+          }')
+
+        HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+        BODY=$(echo "$RESPONSE" | sed '$d' | jq '.' 2>/dev/null || echo "$RESPONSE" | sed '$d')
+
+        echo "##[section]GitHub Dispatch Response (HTTP $HTTP_CODE):"
+        echo "$BODY"
+
+        if [ "$HTTP_CODE" -eq 204 ]; then
+          echo "✅ Sedstart Prod workflow dispatched successfully!"
+          echo "Go to https://github.com/AbdullahB2002/sedstart-github/actions to see the run and Sedstart test results."
+        else
+          echo "❌ Failed to dispatch workflow (HTTP $HTTP_CODE)"
+          echo "Common fixes:"
+          echo "   - Check GITHUB_PAT has 'repo' scope"
+          echo "   - Verify workflow file name is exactly 'sedstart-prod.yml'"
+          echo "   - Confirm default branch is 'main'"
+          exit 1
+        fi
+    env:
+      GITHUB_PAT: $(GITHUB_PAT)  # Maps the secret to the task
