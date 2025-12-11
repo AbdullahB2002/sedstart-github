@@ -4,21 +4,28 @@ pool:
   vmImage: ubuntu-latest
 
 variables:
-- group: SedStartSecrets  # your variable group
+- group: SedStartSecrets   # your variable group name
 
 steps:
-  - checkout: self
+  - checkout: none
+
+  - task: DockerInstaller@0
+    displayName: "Install Docker on agent"
 
   - script: |
-      echo "Triggering SedStart test run..."
-      curl -X POST "https://api.sedstart.com/v1/tests/run" \
-        -H "Content-Type: application/json" \
-        -H "Authorization: Bearer $(SEDSTART_API_KEY_PROD)" \
-        -d '{
-          "project_id": 334,
-          "test_id": 2093,
-          "profile_id": 406,
-          "browser": "chrome",
-          "headless": false
-        }'
-    displayName: "Run SedStart Test via API"
+      echo "Pulling SedStart GitHub Action container..."
+      docker pull ghcr.io/sedinqa/sedstart:latest
+    displayName: "Pull SedStart Docker Image"
+
+  - script: |
+      echo "Running SedStart test..."
+      docker run \
+        -e API_KEY="$(SEDSTART_API_KEY_PROD)" \
+        -e PROJECT_ID="334" \
+        -e TEST_ID="2093" \
+        -e PROFILE_ID="406" \
+        -e BROWSER="chrome" \
+        -e HEADLESS="false" \
+        ghcr.io/sedinqa/sedstart:latest
+    displayName: "Run SedStart Test"
+
