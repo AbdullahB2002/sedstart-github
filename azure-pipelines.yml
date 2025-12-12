@@ -1,39 +1,44 @@
-# Runs once daily at 10:00 AM India time (04:30 UTC), only Mon–Fri
-schedules:
-- cron: "30 4 * * 1-5"                # 04:30 UTC = 10:00 AM IST
-  displayName: Daily 10 AM IST – Sedstart Prod (Weekdays only)
-  branches:
-    include:
-      - main
-  always: true                        # Runs even if no code changes
-
-# Optional: keep manual / push trigger if you want
-trigger:
-  branches:
-    include:
-      - main
+trigger: none
 
 pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  - group: sedstart-secrets             # Contains GITHUB_PAT
+  - group: sedstart-secrets  # Contains your GITHUB_PAT
 
 steps:
   - task: Bash@3
-    displayName: 'Dispatch Sedstart Test – Daily 10 AM IST'
+    displayName: 'Dispatch Sedstart Prod Workflow on GitHub'
     inputs:
       targetType: 'inline'
       script: |
-        echo "Daily Sedstart run triggered at $(date -u +"%Y-%m-%d %H:%M UTC") → 10:00 AM IST"
+        echo "Dispatching workflow: manual.yml on branch main"
 
-        curl -s -X POST \
+        RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
           "https://api.github.com/repos/AbdullahB2002/sedstart-github/actions/workflows/manual.yml/dispatches" \
           -H "Authorization: token $(GITHUB_PAT)" \
           -H "Accept: application/vnd.github.v3+json" \
           -H "Content-Type: application/json" \
-          -d '{"ref":"main"}'
+          -d '{
+            "ref": "main"
+          }')
 
-        echo "Dispatched successfully! Check GitHub in a minute → https://github.com/AbdullahB2002/sedstart-github/actions"
+        HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+        BODY=$(echo "$RESPONSE" | sed '$d')
+
+        echo "##[section]GitHub Dispatch Response (HTTP $HTTP_CODE):"
+        echo "$BODY"
+
+        if [ "$HTTP_CODE" -eq 204 ]; then
+          echo "✅ Success! Sedstart Prod workflow (manual.yml) dispatched successfully!"
+          echo "Check your GitHub Actions run here:"
+          echo "https://github.com/AbdullahB2002/sedstart-github/actions"
+        else
+          echo "❌ Dispatch failed (HTTP $HTTP_CODE)"
+          echo "Double-check:"
+          echo "   - GITHUB_PAT is a classic token with 'repo' scope"
+          echo "   - File is exactly 'manual.yml' on 'main' branch"
+          exit 1
+        fi
     env:
       GITHUB_PAT: $(GITHUB_PAT)
